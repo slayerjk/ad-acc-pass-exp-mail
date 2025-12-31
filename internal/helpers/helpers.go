@@ -1,23 +1,34 @@
 package helpers
 
 import (
-	"math"
+	"fmt"
 	"time"
 )
 
-// Convert LDAP attribute time 'pwdLastSet' to time.Time with given timezon
-// Thanks to https://stackoverflow.com/questions/57901280/calculate-time-time-from-timestamp-starting-from-1601-01-01-in-go
-func ConvertPwdLastSet(input int64, timezone string) time.Time {
-	maxd := time.Duration(math.MaxInt64).Truncate(100 * time.Nanosecond)
-	maxdUnits := int64(maxd / 100) // number of 100-ns units
+// Convert given time to local time zone
+func ConvertToTZ(timeToConvert *time.Time, timezone string) (time.Time, error) {
+	localTz, err := time.LoadLocation(timezone)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to make LoadLocation of given timezone: %s\n%v", timezone, err)
+	}
 
-	t := time.Date(1601, 1, 1, 0, 0, 0, 0, time.UTC)
-	for input > maxdUnits {
-		t = t.Add(maxd)
-		input -= maxdUnits
+	return timeToConvert.In(localTz), nil
+}
+
+// Explain userAccountControl
+func ExplainUserAccountControl(statusCode string) string {
+	switch statusCode {
+	case "512":
+		statusCode = statusCode + " NORMAL_ACCOUNT"
+	case "8388608":
+		statusCode = statusCode + " PASSWORD_EXPIRED"
+	case "514":
+		statusCode = statusCode + " ACCOUNTDISABLE"
+	case "546":
+		statusCode = statusCode + " ACCOUNTDISABLE"
+	default:
+		statusCode = statusCode + " UNKNOWN"
 	}
-	if input != 0 {
-		t = t.Add(time.Duration(input * 100))
-	}
-	return t
+
+	return statusCode
 }
