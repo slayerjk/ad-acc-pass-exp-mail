@@ -13,6 +13,7 @@ require (
 	github.com/go-asn1-ber/asn1-ber v1.5.8-0.20250403174932-29230038a667 // indirect
 	github.com/go-ldap/ldap/v3 v3.4.12 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/slayerjk/go-mailing v0.2.0 // indirect
 	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
 )
