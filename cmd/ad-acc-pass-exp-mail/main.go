@@ -175,7 +175,7 @@ func main() {
 		// send report to admin
 		if mailToAdminIsOn {
 			logger.Info("sending admin report")
-			err := helpers.SendReport(*mailHost, *mailPort, *mailFrom, reportSubject, logFilePath, adminsList, nil)
+			err := mailing.SendReport(*mailHost, *mailPort, *mailFrom, reportSubject, logFilePath, adminsList, nil)
 			if err != nil {
 				logger.Warn("failed to send mail to admins", "admins", adminsList, "err", err)
 			}
@@ -194,7 +194,7 @@ func main() {
 		// send report to admin
 		if mailToAdminIsOn {
 			logger.Info("sending admin report")
-			err := helpers.SendReport(*mailHost, *mailPort, *mailFrom, reportSubject, logFilePath, adminsList, nil)
+			err := mailing.SendReport(*mailHost, *mailPort, *mailFrom, reportSubject, logFilePath, adminsList, nil)
 			if err != nil {
 				logger.Warn("failed to send mail to admins", "admins", adminsList, "err", err)
 			}
@@ -215,7 +215,7 @@ func main() {
 		// send report to admin
 		if mailToAdminIsOn {
 			logger.Info("sending admin report")
-			err := helpers.SendReport(*mailHost, *mailPort, *mailFrom, reportSubject, logFilePath, adminsList, nil)
+			err := mailing.SendReport(*mailHost, *mailPort, *mailFrom, reportSubject, logFilePath, adminsList, nil)
 			if err != nil {
 				logger.Warn("failed to send mail to admins", "admins", adminsList, "err", err)
 			}
@@ -234,6 +234,9 @@ func main() {
 				accStatus:  entry.GetAttributeValue("userAccountControl"),
 				pwdLastSet: entry.GetAttributeValue("pwdLastSet"),
 			}
+
+			// DEBUG
+			// entry.PrettyPrint(4)
 		}
 
 		close(chanEnrichStatus)

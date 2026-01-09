@@ -2,6 +2,8 @@
 
 <h2>Description</h2>
 
+Due to LDAP has no attribute for 'password expires' you have to get ldap attr 'pwdLastSet' and calculate(+) max password age in you org. to get expiration date.
+
 If your AD password will be expired in 60d(check -pet flag) and you want to get notification about it 5d before this(check -pnt flag) - you will be notified by email.
 
 If your pass is already expired - you will get notification also.
