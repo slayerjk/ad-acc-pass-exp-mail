@@ -8,17 +8,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
-
-	// change this path for your project
 
 	"github.com/slayerjk/ad-acc-pass-exp-mail/internal/helpers"
 	mailing "github.com/slayerjk/go-mailing"
 	vafswork "github.com/slayerjk/go-vafswork"
 	ldapwork "github.com/slayerjk/go-valdapwork"
-	"golang.org/x/term"
-	// vawebwork "github.com/slayerjk/go-vawebwork"
 )
 
 const (
@@ -39,8 +34,6 @@ func main() {
 		workDir          string    = vafswork.GetExePath()
 		logsPathDefault  string    = workDir + "/logs" + "_" + appName
 		startTime        time.Time = time.Now()
-		bindUser         string
-		bindUserPassword string
 		accountsToNotify []account
 		accountsFailed   []account
 	)
@@ -59,19 +52,21 @@ func main() {
 	logsToKeep := flag.Int("keep-logs", 7, "set number of logs to keep after rotation")
 	passExpThreshold := flag.Int("pet", 60, "password expiration threshold(after this threshold password will be expired), days")
 	passNotifyThreshold := flag.Int("pnt", 5, "days before expiration for notification, days")
-	mailHost := flag.String("mhost", "NONE", "SMTP host, name or IP")
+	mailHost := flag.String("mhost", "NONE", "REQUIRED, SMTP host, name or IP")
 	mailPort := flag.Int("mport", 25, "SMTP host's port")
-	mailFrom := flag.String("mfrom", "NONE", "mail from address")
-	mailTo := flag.String("mto", "NONE", "mail to, email addresses separated by coma")
+	mailFrom := flag.String("mfrom", "NONE", "REQUIRED, mail from address")
+	mailTo := flag.String("mto", "NONE", "REQUIRED, mail to, email addresses separated by coma")
 	mailToAdmins := flag.String("mtoa", "NONE", "mail to admins if errors occured(send log), email addresses separated by coma")
 	mailSubject := flag.String("msubj", "Accounts with expired password", "mail subject for expired passwords")
-	ldapFqdn := flag.String("lfqdn", "NONE", "FQDN of your LDAP(AD)")
-	baseDn := flag.String("basedn", "NONE", "accounts' baseDN(OU) to search in AD, ex.:'OU=service accounts,OU=busines,DC=example,DC=com'")
+	ldapFqdn := flag.String("lfqdn", "NONE", "REQUIRED, FQDN of your LDAP(AD)")
+	baseDn := flag.String("basedn", "NONE", "REQUIRED, accounts' baseDN(OU) to search in AD, ex.:'OU=service accounts,OU=busines,DC=example,DC=com'")
+	bindUser := flag.String("bu", "NONE", "REQUIRED, bind user, 'USER@DOMAIN'")
+	bindUserPassword := flag.String("bup", "NONE", "REQUIRED, bind user password")
 	timeZone := flag.String("tz", "Asia/Almaty", "your timezone from time zone db, ex:'Asia/Almaty', must be correct")
 
 	flag.Usage = func() {
 		fmt.Println("AD accounts password expiration mail notification")
-		fmt.Println("Version = x.x.x")
+		fmt.Println("Version = v0.0.1")
 		fmt.Println("Usage: <app> [-opt] ...")
 		fmt.Println("Flags:")
 		flag.PrintDefaults()
@@ -98,8 +93,6 @@ func main() {
 	defer logFile.Close()
 	// set logger
 	logger := slog.New(slog.NewTextHandler(logFile, nil))
-	// test logger
-	// logger.Info("info test-1", slog.Any("val", "key"))
 
 	// starting programm notification
 	logger.Info("Program Started", "app name", appName)
@@ -132,21 +125,17 @@ func main() {
 		logger.Error("-basedn flag is not set, exiting")
 		fmt.Println("-basedn flag is not set, exiting")
 		os.Exit(1)
+	case *bindUser == "NONE":
+		logger.Error("-bu flag is not set, exiting")
+		fmt.Println("-bu flag is not set, exiting")
+		os.Exit(1)
+	case *bindUserPassword == "NONE":
+		logger.Error("-bup flag is not set, exiting")
+		fmt.Println("-bup flag is not set, exiting")
+		os.Exit(1)
 	default:
 		logger.Info("all required flags are set")
 	}
-
-	// getting LDAP bind user & password
-	fmt.Print("Enter AD bind user name(<USERNAME>@<YOUR DOMAIN>): ")
-	fmt.Scan(&bindUser)
-	fmt.Print("Enter AD bind user password: ")
-	byteBindUserPassword, err := term.ReadPassword(int(syscall.Stdin))
-	if err != nil {
-		logger.Error("failed to get AD bind user password", "err", err)
-		os.Exit(1)
-	}
-	bindUserPassword = string(byteBindUserPassword)
-	fmt.Println()
 
 	// making list of users to notify
 	mailToList := make([]string, 0)
@@ -187,7 +176,7 @@ func main() {
 
 	// make LDAP bind
 	logger.Info("trying to make LDAP bind")
-	err = ldapwork.LdapBind(ldapCon, bindUser, bindUserPassword)
+	err = ldapwork.LdapBind(ldapCon, *bindUser, *bindUserPassword)
 	if err != nil {
 		logger.Error("failed to make LDAP bind, exiting", slog.Any("user", bindUser), slog.Any("err", err))
 
@@ -281,7 +270,7 @@ func main() {
 			convertedTime := ldapwork.ConvertPwdLastSetAttr(int64(timeToConvert))
 
 			// DEBUG
-			fmt.Println("converted to utc", acc.name, convertedTime)
+			// fmt.Println("converted to utc", acc.name, convertedTime)
 
 			// add timezone
 			convertedTimeTz, err := helpers.ConvertToTZ(&convertedTime, *timeZone)
@@ -293,7 +282,7 @@ func main() {
 			}
 
 			// DEBUG
-			fmt.Println("converted to TZ", acc.name, convertedTimeTz)
+			// fmt.Println("converted to TZ", acc.name, convertedTimeTz)
 
 			acc.pwdLastSetConverted = convertedTimeTz
 
@@ -316,16 +305,19 @@ func main() {
 			}
 
 			// defining expiration date
-			expirationDate := acc.pwdLastSetConverted.AddDate(0, 0, *passExpThreshold).Format("02.01.2006 03:04")
+			expiratonDate := acc.pwdLastSetConverted.AddDate(0, 0, *passExpThreshold)
+			expirationDateStr := expiratonDate.Format("02.01.2006 15:04")
+			// setting start notification date
+			startNotificationDate := expiratonDate.AddDate(0, 0, -*passNotifyThreshold)
 
 			// DEBUG
-			fmt.Println("exp date", acc.name, expirationDate)
+			// fmt.Println("exp date", acc.name, expirationDateStr)
 
 			// checking if already expired
 			logger.Info("checking if password already expired", "name", acc.name, "last set", acc.pwdLastSetConverted)
-			if acc.pwdLastSetConverted.AddDate(0, 0, *passExpThreshold).Before(startTime) {
+			if expiratonDate.Before(startTime) || expiratonDate.Equal(startTime) {
 				logger.Warn("password already expired", "name", acc.name, "last set", acc.pwdLastSetConverted)
-				acc.expirationStatus = fmt.Sprintf("EXPIRED %s", expirationDate)
+				acc.expirationStatus = fmt.Sprintf("EXPIRED: %s", expirationDateStr)
 				accountsToNotify = append(accountsToNotify, acc)
 				continue
 			}
@@ -333,9 +325,9 @@ func main() {
 			// checking if to notify
 			logger.Info("checking if to notify", "name", acc.name, "last set", acc.pwdLastSetConverted)
 
-			if acc.pwdLastSetConverted.AddDate(0, 0, *passExpThreshold).After(startTime.AddDate(0, 0, -*passNotifyThreshold)) {
-				logger.Info("password is going to be expired", "name", acc.name, "last set", acc.pwdLastSetConverted, "expDate", expirationDate)
-				acc.expirationStatus = fmt.Sprintf("WILL BE EXPIRED SOON - %s", expirationDate)
+			if startTime.After(startNotificationDate) {
+				logger.Info("password is going to be expired", "name", acc.name, "last set", acc.pwdLastSetConverted, "expDate", expirationDateStr)
+				acc.expirationStatus = fmt.Sprintf("WILL BE EXPIRED SOON -> %s", expirationDateStr)
 				accountsToNotify = append(accountsToNotify, acc)
 			}
 		}
@@ -348,11 +340,10 @@ func main() {
 	wg.Wait()
 
 	// DEBUG
-	fmt.Println("to notify total:", accountsToNotify)
-	for _, acc := range accountsToNotify {
-		fmt.Println(acc)
-	}
-	fmt.Println("failed:", accountsFailed)
+	// for _, acc := range accountsToNotify {
+	// 	fmt.Println(acc)
+	// }
+	// fmt.Println("failed:", accountsFailed)
 
 	// if there is at least one expired/about to expire pwd acc
 	if len(accountsToNotify) > 0 {
